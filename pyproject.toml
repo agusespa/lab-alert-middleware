@@ -1,0 +1,29 @@
+[project]
+name = "lab-alert-middleware"
+version = "0.1.0"
+description = "Alertmanager to Discord webhook adapter"
+authors = [
+    { name = "Agus Espa", email = "agus.espa@gmail.com" }
+]
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.22.0",
+    "requests>=2.31.0",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.6",
+]
+requires-python = ">=3.10"
+
+[project.scripts]
+lab-alert-middleware = "lab_alert_middleware.main:app"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
