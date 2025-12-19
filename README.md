@@ -16,7 +16,7 @@ The application is configured using environment variables:
 
 #### Using the pre-built image (Recommended)
 
-The image is automatically published to GHCR. You can use it directly in your `docker-compose.yml` or Ansible playbooks:
+The image is automatically published to GHCR and supports both `amd64` and `arm64` architectures. You can use it directly in your `docker-compose.yml` or Ansible playbooks:
 
 ```yaml
 services:
