@@ -55,7 +55,7 @@ def test_format_homeassistant_notification():
     
     formatted = notifier.format_homeassistant_notification(data)
     
-    assert formatted["title"] == "HA Title"
+    assert "⚠️ WARNING: HA Title" in formatted["title"]
     assert formatted["description"] == "HA Message"
     assert formatted["color"] == 0xFFA500
     assert formatted["footer"]["text"] == "Source: Home Assistant"

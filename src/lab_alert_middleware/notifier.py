@@ -108,9 +108,12 @@ class DiscordNotifier:
         
         severity = ha_data.get('severity', 'info')
         color = SEVERITY_COLORS.get(severity, 0x2196F3) # Default HA Blue if not a known severity
+        emoji = SEVERITY_EMOJIS.get(severity, '📊')
+
+        full_title = f"{emoji} {severity.upper()}: {title}"
 
         return {
-            'title': title,
+            'title': full_title,
             'description': message,
             'color': color,
             'timestamp': datetime.utcnow().isoformat(),
