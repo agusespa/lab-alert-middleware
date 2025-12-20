@@ -1,6 +1,6 @@
 # Lab Alert Middleware
 
-A FastAPI-based webhook adapter that converts **Prometheus Alertmanager** and **Home Assistant** notifications into stylish Discord embeds.
+A FastAPI-based webhook adapter that converts incoming notifications into stylish Discord embeds. It's designed to be **service-agnostic**, meaning it can process alerts from any source that follows its simple unified format.
 
 ## Configuration
 
@@ -16,7 +16,7 @@ The application is configured using environment variables:
 
 #### Using the pre-built image (Recommended)
 
-The image is automatically published to GHCR and supports both `amd64` and `arm64` architectures. You can use it directly in your `docker-compose.yml` or Ansible playbooks:
+The image is automatically published to GHCR and supports both `amd64` and `arm64` architectures.
 
 ```yaml
 services:
@@ -28,58 +28,63 @@ services:
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
 ```
 
-#### Local Build
-
-Build and run with Docker Compose:
-```bash
-DISCORD_WEBHOOK_URL=your_url docker-compose up -d --build
-```
-
 ## API Endpoints
 
-- `POST /webhook/alertmanager`: Receives Alertmanager payloads (backward compatible with `/webhook`).
-- `POST /webhook/homeassistant`: Receives Home Assistant payloads.
+- `POST /discord-alert`: Posts formatted alerts to Discord. Accepts the **Unified Alert Format**.
 - `GET /health`: Health check endpoint.
-- `GET /docs`: Automatic OpenAPI documentation.
 
-## Home Assistant Integration
+## Unified Alert Format
 
+The middleware expects a JSON payload matching this structure:
+
+```json
+{
+  "title": "CPUTemperature",
+  "summary": "CPU temperature too high",
+  "description": "CPU at 85°C on lab-pc-1",
+  "severity": "critical",
+  "status": "firing",
+  "timestamp": "2023-12-20T08:00:00Z"
+}
+```
+
+### Specification
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `title` | **Required**. Main name of the alert. | None |
+| `summary` | Optional*. Short one-line summary used as the main message. | None |
+| `description` | Optional*. Detailed info shown in a separate field. | None |
+| `severity` | `critical`, `warning`, `info` | `info` |
+| `status` | `firing`, `resolved` | `firing` |
+| `timestamp` | Optional. ISO8601 timestamp. | Current Time |
+
+\* *At least one of `summary` or `description` must be provided. If both are missing, the alert will be rejected.*
+
+## Usage Examples
+
+### Generic Curl (Unified Format)
+```bash
+curl -X POST http://localhost:5001/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Door Open", "summary": "Front door was opened", "severity": "warning"}'
+```
+
+### Home Assistant Integration
 You can send notifications from Home Assistant using a `RESTful Command`:
 
 ```yaml
 rest_command:
-  discord_notification:
-    url: "http://your-middleware-ip:5001/webhook/homeassistant"
+  alertmanager_middleware:
+    url: "http://192.168.1.157:5001/discord-alert"
     method: POST
-    payload: '{"title": "{{ title }}", "message": "{{ message }}", "data": {"severity": "{{ severity | default("info") }}"}}'
-    content_type: "application/json"
-```
-
-### Sample JSON Payload
-
-If you are using `curl` or another tool, the expected JSON format is:
-
-```json
-{
-  "title": "Battery Low",
-  "message": "The front door lock battery is at 10%",
-  "data": {
-    "severity": "warning"
-  }
-}
-```
-
-### Payload Specification
-
-| Field | Description | Default |
-|-------|-------------|---------|
-| `title` | Notification title | `Home Assistant Notification` |
-| `message` | Notification body | `No message provided` |
-| `data.severity` | `critical`, `warning`, `info` | `info` |
-
-## Testing
-
-Run tests using pytest:
-```bash
-DISCORD_WEBHOOK_URL=mock pytest
+    content_type: 'application/json'
+    payload: >
+      {
+        "title": "{{ title }}",
+        "summary": "{{ summary | default(message) }}",
+        "description": "{{ description | default('') }}",
+        "severity": "{{ severity | default('info') }}",
+        "status": "{{ status | default('firing') }}",
+        "timestamp": "{{ timestamp | default(now().isoformat()) }}"
 ```

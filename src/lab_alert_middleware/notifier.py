@@ -1,12 +1,15 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 from .config import settings
 
+from .models import UnifiedAlert
+
 SEVERITY_COLORS = {
-    'critical': 0xFF0000,  # Red
-    'warning': 0xFFA500,   # Orange
-    'info': 0x00FF00       # Green
+    'critical': 0xFF0000,   # Red
+    'warning': 0xFFA500,    # Orange
+    'info': 0x2196F3,       # Blue
+    'resolved': 0x2ECC71    # Emerald Green
 }
 
 SEVERITY_EMOJIS = {
@@ -19,108 +22,60 @@ class DiscordNotifier:
     def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
 
-    def format_alert(self, alert: Dict[str, Any]) -> Dict[str, Any]:
-        status = alert.get('status', 'firing')
-        labels = alert.get('labels', {})
-        annotations = alert.get('annotations', {})
-        severity = labels.get('severity', 'info')
-        
+    def format_embed(self, alert: UnifiedAlert) -> Dict[str, Any]:
+        status = alert.status
+        severity = alert.severity.lower()
+        title_text = alert.title
+        summary = alert.summary
+        description_attr = alert.description
+        timestamp_raw = alert.timestamp
+
         # Determine color and emoji
         color = SEVERITY_COLORS.get(severity, 0x808080)
         emoji = SEVERITY_EMOJIS.get(severity, '📊')
         
-        # Build title
+        # Build title and color
         if status == 'resolved':
-            title = f"✅ RESOLVED: {labels.get('alertname', 'Unknown Alert')}"
-            color = 0x00FF00
+            full_title = f"✅ RESOLVED: {title_text}"
+            color = SEVERITY_COLORS['resolved']
         else:
-            title = f"{emoji} {severity.upper()}: {labels.get('alertname', 'Unknown Alert')}"
+            full_title = f"{emoji} {severity.upper()}: {title_text}"
+            color = SEVERITY_COLORS.get(severity, 0x808080)
         
-        # Build description
-        description = annotations.get('summary', annotations.get('description', 'No description'))
-        
-        # Build fields
+        # Build description & fields
         fields = []
-        
-        if annotations.get('description'):
-            fields.append({
-                'name': 'Details',
-                'value': annotations['description'][:1024],
-                'inline': False
-            })
-
-        # Add labels filtering out system ones
-        ignored_labels = {'alertname', 'severity', 'instance', 'job'}
-        visible_labels = {k: v for k, v in labels.items() if k not in ignored_labels}
-        
-        if visible_labels:
-            label_text = '\n'.join([f"**{k}**: {v}" for k, v in visible_labels.items()])
-            fields.append({
-                'name': 'Tags',
-                'value': label_text[:1024],
-                'inline': True
-            })
-        
-        # Add timestamp
-        starts_at = alert.get('startsAt', '')
-        if starts_at:
-            try:
-                dt = datetime.fromisoformat(starts_at.replace('Z', '+00:00'))
-                timestamp = dt.isoformat()
-            except Exception:
-                timestamp = starts_at
+        if summary:
+            description = summary
+            if description_attr:
+                fields.append({
+                    'name': 'Details',
+                    'value': description_attr[:1024],
+                    'inline': False
+                })
         else:
-            timestamp = datetime.utcnow().isoformat()
-        
-        return {
-            'title': title,
-            'description': description[:2048],
-            'color': color,
-            'fields': fields,
-            'timestamp': timestamp,
-            'footer': {
-                'text': f"Severity: {severity}"
-            }
-        }
+            description = description_attr or "No details provided"
 
-    def send_notifications(self, alerts: List[Dict[str, Any]]):
-        embeds = [self.format_alert(alert) for alert in alerts]
-        self._send_embeds(embeds)
-
-    def send_homeassistant_notification(self, data: Dict[str, Any]):
-        embed = self.format_homeassistant_notification(data)
-        self._send_embeds([embed])
-
-    def format_homeassistant_notification(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Home Assistant payload typically contains:
-        {
-            "title": "Optional Title",
-            "message": "The notification message",
-            "data": {
-                "severity": "optional severity (info, warning, critical)"
-            }
-        }
-        """
-        title = data.get('title', 'Home Assistant Notification')
-        message = data.get('message', 'No message provided')
-        ha_data = data.get('data', {})
-        
-        severity = ha_data.get('severity', 'info')
-        color = SEVERITY_COLORS.get(severity, 0x2196F3) # Default HA Blue if not a known severity
-        emoji = SEVERITY_EMOJIS.get(severity, '📊')
-
-        full_title = f"{emoji} {severity.upper()}: {title}"
+        # Process timestamp
+        try:
+            if timestamp_raw:
+                dt = datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
+                timestamp = dt.isoformat()
+            else:
+                timestamp = datetime.now(timezone.utc).isoformat()
+        except Exception:
+            timestamp = timestamp_raw
 
         return {
             'title': full_title,
-            'description': message,
+            'description': description[:2048],
             'color': color,
-            'timestamp': datetime.utcnow().isoformat(),
-            'footer': {
-                'text': 'Source: Home Assistant'
-            }
+            'fields': fields,
+            'timestamp': timestamp
         }
+
+    def send_notifications(self, alerts: List[UnifiedAlert]):
+        embeds = [self.format_embed(alert) for alert in alerts]
+        self._send_embeds(embeds)
 
     def _send_embeds(self, embeds: List[Dict[str, Any]]):
         # Discord allows max 10 embeds per message

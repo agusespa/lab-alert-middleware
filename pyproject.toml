@@ -1,9 +1,9 @@
 [project]
 name = "lab-alert-middleware"
-version = "0.1.1"
-description = "Alertmanager to Discord webhook adapter"
+version = "0.1.2"
+description = "Discord webhook adapter"
 authors = [
-    { name = "Agus Espa", email = "agus.espa@gmail.com" }
+    { name = "Agustin Espana", email = "agusespa@me.com" }
 ]
 dependencies = [
     "fastapi>=0.100.0",
