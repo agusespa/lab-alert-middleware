@@ -22,7 +22,7 @@ def test_unified_webhook(mock_post):
         "severity": "critical"
     }
     
-    response = client.post("/webhook", json=payload)
+    response = client.post("/discord-alert", json=payload)
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
     assert mock_post.called
@@ -33,6 +33,6 @@ def test_unified_webhook_invalid_payload():
         "title": "Invalid Alert"
     }
     
-    response = client.post("/webhook", json=payload)
+    response = client.post("/discord-alert", json=payload)
     assert response.status_code == 422
     assert "Either 'summary' or 'description' must be provided" in response.text

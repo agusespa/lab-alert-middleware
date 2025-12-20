@@ -65,7 +65,7 @@ The middleware expects a JSON payload matching this structure:
 
 ### Generic Curl (Unified Format)
 ```bash
-curl -X POST http://localhost:5001/webhook \
+curl -X POST http://localhost:5001/discord-alert \
   -H "Content-Type: application/json" \
   -d '{"title": "Door Open", "summary": "Front door was opened", "severity": "warning"}'
 ```

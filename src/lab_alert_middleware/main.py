@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)
 
-@app.post("/webhook")
+@app.post("/discord-alert")
 async def webhook_unified(alerts: Union[UnifiedAlert, List[UnifiedAlert]]):
     """
     Unified webhook endpoint that accepts a single alert or a list of alerts
