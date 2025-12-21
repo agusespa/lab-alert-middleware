@@ -1,8 +1,10 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from lab_alert_middleware.notifier import DiscordNotifier
+from lab_alert_middleware.notifier import DiscordNotifier, RateLimiter
 from lab_alert_middleware.models import UnifiedAlert
 import httpx
+import asyncio
+import time
 
 def test_format_unified_firing():
     notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/123/test")
@@ -193,3 +195,40 @@ async def test_send_notifications_timeout():
         
         assert "timed out" in str(exc_info.value).lower()
 
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_allows_under_limit():
+    limiter = RateLimiter(max_requests=5, window_seconds=1)
+    
+    # Should allow 5 requests without delay
+    start = time.time()
+    for _ in range(5):
+        await limiter.acquire()
+    elapsed = time.time() - start
+    
+    assert elapsed < 0.5  # Should be nearly instant
+
+@pytest.mark.asyncio
+async def test_rate_limiter_blocks_over_limit():
+    limiter = RateLimiter(max_requests=3, window_seconds=1)
+    
+    # First 3 should be instant
+    for _ in range(3):
+        await limiter.acquire()
+    
+    # 4th should wait
+    start = time.time()
+    await limiter.acquire()
+    elapsed = time.time() - start
+    
+    assert elapsed >= 0.9  # Should wait ~1 second
+
+@pytest.mark.asyncio
+async def test_notifier_uses_rate_limiter():
+    notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/123/test")
+    
+    # Verify rate limiter is initialized
+    assert notifier.rate_limiter is not None
+    assert notifier.rate_limiter.max_requests == 30
+    assert notifier.rate_limiter.window_seconds == 60

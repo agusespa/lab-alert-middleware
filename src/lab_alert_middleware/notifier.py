@@ -1,7 +1,9 @@
 import httpx
 import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+from collections import deque
 from .config import settings
 
 from .models import UnifiedAlert
@@ -21,9 +23,34 @@ SEVERITY_EMOJIS = {
     'info': 'ℹ️'
 }
 
+class RateLimiter:
+    """Simple rate limiter for Discord webhooks (30 requests per minute)"""
+    
+    def __init__(self, max_requests: int = 30, window_seconds: int = 60) -> None:
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests: deque = deque()
+    
+    async def acquire(self) -> None:
+        """Wait if necessary to respect rate limits"""
+        now = datetime.now(timezone.utc).timestamp()
+        
+        while self.requests and self.requests[0] < now - self.window_seconds:
+            self.requests.popleft()
+        
+        if len(self.requests) >= self.max_requests:
+            sleep_time = (self.requests[0] + self.window_seconds) - now + 0.1
+            if sleep_time > 0:
+                logger.info(f"Rate limit reached, waiting {sleep_time:.1f}s")
+                await asyncio.sleep(sleep_time)
+                await self.acquire()
+        
+        self.requests.append(now)
+
 class DiscordNotifier:
     def __init__(self, webhook_url: str) -> None:
         self.webhook_url = webhook_url
+        self.rate_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
     def format_embed(self, alert: UnifiedAlert) -> Dict[str, Any]:
         status = alert.status
@@ -92,9 +119,10 @@ class DiscordNotifier:
         await self._send_embeds(embeds)
 
     async def _send_embeds(self, embeds: List[Dict[str, Any]]) -> None:
-        # Discord allows max 10 embeds per message
         async with httpx.AsyncClient() as client:
             for i in range(0, len(embeds), 10):
+                await self.rate_limiter.acquire()
+                
                 batch = embeds[i:i+10]
                 payload = {
                     'embeds': batch,
