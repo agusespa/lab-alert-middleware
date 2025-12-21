@@ -1,6 +1,6 @@
 [project]
 name = "lab-alert-middleware"
-version = "0.1.4"
+version = "1.0.0"
 description = "Discord webhook adapter"
 authors = [
     { name = "Agustin Espana", email = "agusespa@me.com" }
