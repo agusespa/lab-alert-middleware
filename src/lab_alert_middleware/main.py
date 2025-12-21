@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title=settings.app_name)
 
 @app.post("/discord-alert")
-async def webhook_unified(alerts: Union[UnifiedAlert, List[UnifiedAlert]]):
+async def webhook_unified(alerts: Union[UnifiedAlert, List[UnifiedAlert]]) -> dict[str, str]:
     """
     Unified webhook endpoint that accepts a single alert or a list of alerts
     in the standard internal format.
@@ -19,14 +19,14 @@ async def webhook_unified(alerts: Union[UnifiedAlert, List[UnifiedAlert]]):
     try:
         if isinstance(alerts, UnifiedAlert):
             alerts = [alerts]
-        notifier.send_notifications(alerts)
+        await notifier.send_notifications(alerts)
     except Exception as e:
         logger.error(f"Error sending unified notification: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     return {"status": "ok"}
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 if __name__ == "__main__":
