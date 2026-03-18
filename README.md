@@ -31,6 +31,7 @@ services:
 ## API Endpoints
 
 - `POST /discord-alert`: Posts formatted alerts to Discord. Accepts the **Unified Alert Format**.
+- `POST /alertmanager`: Accepts native **Prometheus Alertmanager** webhook payloads and maps them to the unified format.
 - `GET /health`: Health check endpoint.
 
 ## Unified Alert Format
@@ -87,4 +88,15 @@ rest_command:
         "severity": "{{ severity | default('info') }}",
         "status": "{{ status | default('firing') }}",
         "timestamp": "{{ timestamp | default(now().isoformat()) }}"
+```
+
+### Prometheus Alertmanager Integration
+Point Alertmanager webhook receiver to `/alertmanager` using native Alertmanager payloads.
+
+```yaml
+receivers:
+  - name: "discord"
+    webhook_configs:
+      - url: "http://192.168.1.157:5001/alertmanager"
+        send_resolved: true
 ```

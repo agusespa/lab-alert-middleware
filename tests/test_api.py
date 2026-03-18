@@ -65,3 +65,73 @@ def test_unified_webhook_list_of_alerts(mock_client_class):
     response = client.post("/discord-alert", json=payload)
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+@patch("lab_alert_middleware.notifier.httpx.AsyncClient")
+def test_alertmanager_webhook_payload(mock_client_class):
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = lambda: None
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client_class.return_value = mock_client
+
+    payload = {
+        "receiver": "discord",
+        "status": "firing",
+        "alerts": [
+            {
+                "status": "firing",
+                "labels": {
+                    "alertname": "TestAlert",
+                    "severity": "warning",
+                    "instance": "test-instance",
+                },
+                "annotations": {
+                    "summary": "Test alert from manual trigger",
+                    "description": "This is a test to verify Discord webhook integration is working",
+                },
+                "startsAt": "2026-03-18T00:00:00.000Z",
+            }
+        ],
+    }
+
+    response = client.post("/alertmanager", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+    assert mock_client.post.called
+
+
+@patch("lab_alert_middleware.notifier.httpx.AsyncClient")
+def test_alertmanager_webhook_fallback_summary(mock_client_class):
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = lambda: None
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client_class.return_value = mock_client
+
+    payload = {
+        "status": "firing",
+        "alerts": [
+            {
+                "labels": {"alertname": "NoAnnotationsAlert"},
+            }
+        ],
+    }
+
+    response = client.post("/alertmanager", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_alertmanager_webhook_empty_alerts():
+    response = client.post("/alertmanager", json={"status": "firing", "alerts": []})
+    assert response.status_code == 422
+    assert response.json()["detail"] == "No alerts provided in payload"
